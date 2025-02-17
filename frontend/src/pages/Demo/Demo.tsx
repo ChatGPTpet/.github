@@ -12,7 +12,9 @@ import ChatContainer from '../../components/layout/ChatContainer/ChatContainer';
 import { Message, Result } from '../../models/Message';
 import {
   createChatGPTMessage,
-  createSearchMessage
+  createSearchMessage,
+  createWebSearchMessage
+  
 } from '../../api/messageApi';
 import FileSelector from '../../components/common/FileSelector/FileSelector';
 import ExampleCards from '../../components/common/Cards/ExampleCards/ExampleCards';
@@ -28,6 +30,9 @@ const Demo = () => {
   const [room, setRoom] = useState<Room | null>(null);
   const [anonymized, setAnonymized] = useState(true);
   const [isMessageLoading, setIsMessageLoading] = useState(false);
+
+  const [searchMode, setSearchMode] = useState<'document' | 'web'>('document');
+
 
   const anonymizeContent = useCallback(
     (
@@ -145,66 +150,89 @@ const Demo = () => {
       created_at: new Date().toISOString()
     };
 
-    const tempMessage: Message = {
-      user: room.user,
-      room: room,
-      role: 'system',
-      content: [],
-      created_at: new Date().toISOString()
-    };
+    if (searchMode === 'web') {
+      const webSearchMessage: Message = {
+        ...newMessage,
+        content: `Please search the web for information about: ${value}`
+      };
+      
+      setIsMessageLoading(true);
+      createWebSearchMessage(webSearchMessage, true)
+        .then((createdMessage) => {
+          setRoom(prevRoom => ({
+            ...prevRoom!,
+            messages: [...prevRoom!.messages, newMessage, createdMessage]
+          }));
+        })
+        .catch((error) => {
+          const errorMessage = error.response?.data?.error || t('unexpectedErrorOccurred');
+          showToast(`${t('errorSearchingWeb')}: ${errorMessage}`, 'error');
+        })
+        .finally(() => setIsMessageLoading(false));
+      return;
+    }
 
-    setIsMessageLoading(true);
+    if (searchMode === 'document') {
+      const tempMessage: Message = {
+        user: room.user,
+        room: room,
+        role: 'system',
+        content: [],
+        created_at: new Date().toISOString()
+      };
 
-    const updatedRoomWithoutTemp = {
-      ...room,
-      messages: [...room.messages, newMessage]
-    };
-    setRoom(updatedRoomWithoutTemp);
+      setIsMessageLoading(true);
 
-    const updatedRoom = {
-      ...room,
-      messages: [...room.messages, newMessage, tempMessage]
-    };
-    setRoom(updatedRoom);
+      const updatedRoomWithoutTemp = {
+        ...room,
+        messages: [...room.messages, newMessage]
+      };
+      setRoom(updatedRoomWithoutTemp);
 
-    createSearchMessage(newMessage)
-      .then((createdMessage) => {
-        if (Array.isArray(createdMessage.content)) {
-          createdMessage.content.forEach((contentObj: Result) => {
-            if (anonymized) {
-              contentObj.content = anonymizeContent(
-                contentObj.content,
-                createdMessage.room.anonymizationMappings,
-                anonymized
-              );
-            }
+      const updatedRoom = {
+        ...room,
+        messages: [...room.messages, newMessage, tempMessage]
+      };
+      setRoom(updatedRoom);
+
+      createSearchMessage(newMessage)
+        .then((createdMessage) => {
+          if (Array.isArray(createdMessage.content)) {
+            createdMessage.content.forEach((contentObj: Result) => {
+              if (anonymized) {
+                contentObj.content = anonymizeContent(
+                  contentObj.content,
+                  createdMessage.room.anonymizationMappings,
+                  anonymized
+                );
+              }
+            });
+          }
+
+          setRoom((prevRoom) => {
+            if (!prevRoom) return null;
+
+            const filteredMessages = prevRoom.messages.filter(
+              (msg) => msg.role !== 'system'
+            );
+            const newMessages = [...filteredMessages, createdMessage];
+
+            return {
+              ...prevRoom,
+              messages: newMessages,
+              anonymizationMappings: createdMessage.room.anonymizationMappings
+            };
           });
-        }
-
-        setRoom((prevRoom) => {
-          if (!prevRoom) return null;
-
-          const filteredMessages = prevRoom.messages.filter(
-            (msg) => msg.role !== 'system'
-          );
-          const newMessages = [...filteredMessages, createdMessage];
-
-          return {
-            ...prevRoom,
-            messages: newMessages,
-            anonymizationMappings: createdMessage.room.anonymizationMappings
-          };
-        });
-      })
-      .catch((error) => {
-        const errorMessage =
-          error.response?.data?.error || t('unexpectedErrorOccurred');
-        showToast(`${t('errorSendingMessage')}: ${errorMessage}`, 'error');
-      })
-      .finally(() => setIsMessageLoading(false));
+        })
+        .catch((error) => {
+          const errorMessage =
+            error.response?.data?.error || t('unexpectedErrorOccurred');
+          showToast(`${t('errorSendingMessage')}: ${errorMessage}`, 'error');
+        })
+        .finally(() => setIsMessageLoading(false));
+    }
   };
 
-  // Doc-Hint: Should be a different solution where message should be grouped together with question and context.
   const messageToChatGPT = (room: Room) => {
     let question = '';
     let context = '';
@@ -303,6 +331,7 @@ const Demo = () => {
           />
         </div>
       </div>
+
       {room && room.messages.length === 0 ? (
         <div className={styles.exampleContainer}>
           <div className={styles.chatEmptyState}>
@@ -324,6 +353,25 @@ const Demo = () => {
           <ChatInput onSendMessage={onSendMessage} demo />
         </div>
       )}
+
+      <div className={styles.modeButtons}>
+        <Button
+          size="large"
+          appearance={searchMode === 'document' ? "primary" : "subtle"}
+          onClick={() => setSearchMode('document')}
+          className={styles.modeButton}
+        >
+          {t('documentChat')}
+        </Button>
+        <Button
+          size="large"
+          appearance={searchMode === 'web' ? "primary" : "subtle"}
+          onClick={() => setSearchMode('web')}
+          className={styles.modeButton}
+        >
+          {t('webSearch')}
+        </Button>
+      </div>
     </div>
   );
 };

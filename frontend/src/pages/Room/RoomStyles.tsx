@@ -59,7 +59,23 @@ const RoomStyles = makeStyles({
   },
   anonSwitch: {
     width: '240px'
-  }
+  },
+  modeButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    width: '100%',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+  },
+  modeButton: {
+    alignSelf: 'center',
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalS,
+    marginLeft: '8px',
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
+  },
 });
 
 export default RoomStyles;

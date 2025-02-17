@@ -5,6 +5,8 @@ import tiktoken
 from django.db import models
 from django.db.models import JSONField
 from langchain.llms import OpenAI
+from django.utils import timezone
+
 
 from .room_settings import RoomSettings
 
@@ -20,7 +22,15 @@ class User(models.Model):
     username = models.CharField(max_length=255)
     email = models.CharField(max_length=255)
     lang = models.CharField(max_length=2, default="en")  # using ISO 639-1 codes
-    max_api_calls = models.IntegerField(default=50)
+    max_api_calls = models.IntegerField(default=50)  
+    last_reset_date = models.DateField(auto_now_add=True)  # Field to track when API call limit was last reset
+
+    def reset_api_calls_if_needed(self):
+        today = timezone.now().date()
+        if self.last_reset_date < today or (self.last_reset_date == today and self.max_api_calls == 0):
+            self.max_api_calls = 50
+            self.last_reset_date = today
+            self.save()
 
     def __str__(self):
         return self.auth0_id

@@ -48,7 +48,25 @@ const DemoStyles = makeStyles({
     width: '240px'
   },
   chatEmptyStateTitle: typographyStyles.display,
-  chatEmptyStateSubtitle: typographyStyles.subtitle1
+  chatEmptyStateSubtitle: typographyStyles.subtitle1,
+
+  // Styles for the mode toggle button
+  modeButtons: {
+    display: 'flex',
+    justifyContent: 'center',
+    width: '100%',
+    paddingTop: tokens.spacingVerticalS,
+    paddingBottom: tokens.spacingVerticalS,
+  },
+  modeButton: {
+    alignSelf: 'center',
+    marginTop: tokens.spacingVerticalXS,
+    marginBottom: tokens.spacingVerticalS,
+    marginLeft: '8px',
+    ':hover': {
+      backgroundColor: tokens.colorNeutralBackground1Hover,
+    },
+  },
 });
 
 export default DemoStyles;

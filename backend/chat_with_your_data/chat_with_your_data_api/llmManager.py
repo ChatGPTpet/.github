@@ -1,6 +1,7 @@
 # Import the openai package
 import os
 from pprint import pprint
+from duckduckgo_search import DDGS
 
 import openai
 
@@ -53,7 +54,20 @@ class LLM:
         self.apiKey = apiKey
         openai.api_key = self.apiKey
 
-    def run(self, room: Room, question: str, model: str, is_demo: bool = False):
+    def perform_web_search(self, query, num_results=3):
+        try:
+            with DDGS() as ddgs:
+                search_results = list(ddgs.text(query, max_results=num_results))
+            formatted_results = "\n".join([
+                f"- {result['title']}: {result['body']}"
+                for result in search_results
+            ])
+            return formatted_results
+        except Exception as e:
+            print(f"Error: {str(e)}")
+            return "Error"
+
+    def run(self, room: Room, question: str, model: str, is_web_search: bool = False, is_demo: bool = False):
         """
         Run a chat request to the selected OpenAI model.
 
@@ -63,23 +77,51 @@ class LLM:
         :param is_demo: Flag to indicate if it's a demo mode.
         :return: The assistant's response.
         """
-        # Ensure the selected model is valid and not injected by malicious users
+        # 验证模型
         valid_models = ["gpt-3.5-turbo", "gpt-4o", "gpt-4o-mini"]
         if model not in valid_models:
             raise ValueError(f"Invalid model '{model}'. Choose from {valid_models}")
 
         room.appendContext(room, "user", question, is_demo)
 
-        response = openai.ChatCompletion.create(
-            model=model,
-            messages=room.createFullMessage(room, False, is_demo, question),
-        )
-        print(room.createFullMessage(room, False, is_demo, question))
+        if is_web_search:
+           
+            search_results = self.perform_web_search(question)
+            
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are a helpful assistant that can provide up-to-date information based on web search results. Please analyze the search results and provide a comprehensive answer."
+                },
+                {
+                    "role": "user",
+                    "content": f"Based on the following search results, answer the question:\n\nQuestion: {question}\n\nSearch Results:\n{search_results}"
+                }
+            ]
+        else:
+            messages = room.createFullMessage(room, False, is_demo, question)
 
+
+        #  API call parameters
+        api_params = {
+            "model": model,  # 直接使用用户选择的模型
+            "messages": messages,
+            "temperature": 0.7,
+        }
+
+        print("Sending API parameters:", api_params)
+
+        # 调用OpenAI API
+        response = openai.ChatCompletion.create(**api_params)
         response_content = response["choices"][0]["message"]["content"]
-        room.appendContext(room, "assistant", response_content, is_demo)
 
+        if not response_content:
+            response_content = "I apologize, I cannot generate an appropriate response. Please try rephrasing your question."
+
+        # Add the response to context
+        room.appendContext(room, "assistant", response_content, is_demo)
         return response_content
+
 
 
 class llmManager:

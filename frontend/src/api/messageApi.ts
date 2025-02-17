@@ -22,3 +22,17 @@ export const createChatGPTMessage = (
     data: message
   });
 };
+
+export const createWebSearchMessage = (
+  message: Message,
+  demo?: boolean
+): Promise<Message> => {
+  const baseUrl = '/api/messages/websearch';
+  const url = demo ? `${baseUrl}?demo=true` : baseUrl;
+
+  return Request({
+    url: url,
+    method: 'POST',
+    data: message
+  });
+};

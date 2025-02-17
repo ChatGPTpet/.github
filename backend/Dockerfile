@@ -11,6 +11,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libpq-dev gcc curl python3-dev tesseract-ocr ghostscript && \
     pip install --upgrade "pip<24.1" && pip install pipenv && \
     pip install textract && \
+    pip install duckduckgo-search && \
     rm -rf /var/lib/apt/lists/*
 
 RUN apt-get update && apt-get install -y curl

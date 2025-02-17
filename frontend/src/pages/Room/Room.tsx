@@ -22,7 +22,8 @@ import { useToast } from '../../context/ToastProvider';
 import { getRoom, updateRoom, updateRoomFiles } from '../../api/roomsApi';
 import {
   createChatGPTMessage,
-  createSearchMessage
+  createSearchMessage,
+  createWebSearchMessage
 } from '../../api/messageApi';
 import FileSelector from '../../components/common/FileSelector/FileSelector';
 import InfoHover from '../../components/common/Dialogs/InfoHover';
@@ -38,6 +39,7 @@ const Room = () => {
   const [settingsDrawerOpen, setSettingsDrawerOpenState] = useState(false);
   const [anonymized, setAnonymized] = useState(true);
   const [isMessageLoading, setIsMessageLoading] = useState(false);
+  const [searchMode, setSearchMode] = useState<'document' | 'web'>('document');
 
   const anonymizeContent = useCallback(
     (
@@ -161,76 +163,100 @@ const Room = () => {
       created_at: new Date().toISOString()
     };
 
-    const tempMessage: Message = {
-      user: room.user,
-      room: room,
-      role: 'system',
-      content: [],
-      created_at: new Date().toISOString()
-    };
+    if (searchMode === 'web') {
+      const webSearchMessage: Message = {
+        ...newMessage,
+        content: `Please search the web for information about: ${value}`
+      };
+      
+      setIsMessageLoading(true);
+      createWebSearchMessage(webSearchMessage)
+        .then((createdMessage) => {
+          setRoom(prevRoom => ({
+            ...prevRoom!,
+            messages: [...prevRoom!.messages, newMessage, createdMessage]
+          }));
+        })
+        .catch((error) => {
+          const errorMessage = error.response?.data?.error || t('unexpectedErrorOccurred');
+          showToast(`${t('errorSearchingWeb')}: ${errorMessage}`, 'error');
+        })
+        .finally(() => setIsMessageLoading(false));
+      return;
+    }
 
-    setIsMessageLoading(true);
+    if (searchMode === 'document') {
+      const tempMessage: Message = {
+        user: room.user,
+        room: room,
+        role: 'system',
+        content: [],
+        created_at: new Date().toISOString()
+      };
 
-    const updatedRoomWithoutTemp = {
-      ...room,
-      messages: [...room.messages, newMessage]
-    };
-    setRoom(updatedRoomWithoutTemp);
+      setIsMessageLoading(true);
 
-    const updatedRoom = {
-      ...room,
-      messages: [...room.messages, newMessage, tempMessage]
-    };
-    setRoom(updatedRoom);
+      const updatedRoomWithoutTemp = {
+        ...room,
+        messages: [...room.messages, newMessage]
+      };
+      setRoom(updatedRoomWithoutTemp);
 
-    createSearchMessage(newMessage)
-      .then((createdMessage) => {
-        if (Array.isArray(createdMessage.content)) {
-          createdMessage.content.forEach((contentObj: Result) => {
-            if (anonymized) {
-              contentObj.content = anonymizeContent(
-                contentObj.content,
-                createdMessage.room.anonymizationMappings,
-                anonymized,
-                room
-              );
-              contentObj.context_before = anonymizeContent(
-                contentObj.context_before,
-                createdMessage.room.anonymizationMappings,
-                anonymized,
-                room
-              );
-              contentObj.context_after = anonymizeContent(
-                contentObj.context_after,
-                createdMessage.room.anonymizationMappings,
-                anonymized,
-                room
-              );
-            }
+      const updatedRoom = {
+        ...room,
+        messages: [...room.messages, newMessage, tempMessage]
+      };
+      setRoom(updatedRoom);
+
+      createSearchMessage(newMessage)
+        .then((createdMessage) => {
+          if (Array.isArray(createdMessage.content)) {
+            createdMessage.content.forEach((contentObj: Result) => {
+              if (anonymized) {
+                contentObj.content = anonymizeContent(
+                  contentObj.content,
+                  createdMessage.room.anonymizationMappings,
+                  anonymized,
+                  room
+                );
+                contentObj.context_before = anonymizeContent(
+                  contentObj.context_before,
+                  createdMessage.room.anonymizationMappings,
+                  anonymized,
+                  room
+                );
+                contentObj.context_after = anonymizeContent(
+                  contentObj.context_after,
+                  createdMessage.room.anonymizationMappings,
+                  anonymized,
+                  room
+                );
+              }
+            });
+          }
+
+          setRoom((prevRoom) => {
+            if (!prevRoom) return null;
+
+            const filteredMessages = prevRoom.messages.filter(
+              (msg) => msg.role !== 'system'
+            );
+            const newMessages = [...filteredMessages, createdMessage];
+
+            return {
+              ...prevRoom,
+              messages: newMessages,
+              anonymizationMappings: createdMessage.room.anonymizationMappings
+            };
           });
-        }
-
-        setRoom((prevRoom) => {
-          if (!prevRoom) return null;
-
-          const filteredMessages = prevRoom.messages.filter(
-            (msg) => msg.role !== 'system'
-          );
-          const newMessages = [...filteredMessages, createdMessage];
-
-          return {
-            ...prevRoom,
-            messages: newMessages,
-            anonymizationMappings: createdMessage.room.anonymizationMappings
-          };
-        });
-      })
-      .catch((error) => {
-        const errorMessage =
-          error.response?.data?.error || t('unexpectedErrorOccurred');
-        showToast(`${t('errorSendingMessage')}: ${errorMessage}`, 'error');
-      })
-      .finally(() => setIsMessageLoading(false));
+        })
+        .catch((error) => {
+          const errorMessage =
+            error.response?.data?.error || t('unexpectedErrorOccurred');
+          showToast(`${t('errorSendingMessage')}: ${errorMessage}`, 'error');
+        })
+        .finally(() => setIsMessageLoading(false));
+    }
   };
   // Doc-Hint: Should be a different solution where message should be grouped together with question and context.
   const messageToChatGPT = (room: RoomType) => {
@@ -518,6 +544,24 @@ const Room = () => {
         isLoading={isMessageLoading}
       />
       <ChatInput onSendMessage={onSendMessage} />
+      <div className={styles.modeButtons}>
+        <Button
+          size="large"
+          appearance={searchMode === 'document' ? "primary" : "subtle"}
+          onClick={() => setSearchMode('document')}
+          className={styles.modeButton}
+        >
+          {t('documentChat')}
+        </Button>
+        <Button
+          size="large"
+          appearance={searchMode === 'web' ? "primary" : "subtle"}
+          onClick={() => setSearchMode('web')}
+          className={styles.modeButton}
+        >
+          {t('webSearch')}
+        </Button>
+      </div>
     </div>
   );
 };

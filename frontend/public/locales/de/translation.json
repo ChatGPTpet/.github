@@ -132,5 +132,9 @@
   "reCategorize" : "Re-Kategorisieren",
   "confirmReCategorization": "Re-Kategorisierung bestätigen",
   "confirm" : "Bestätigen",
-  "cancel" : "Abbrechen"
+  "cancel" : "Abbrechen",
+  "documentChat": "Dokumenten-Chat",
+  "normalChat": "Normaler Chat",
+  "webSearch": "Web-Suche",
+  "errorSearchingWeb": "Fehler beim Suchen im Web"
 }

@@ -15,7 +15,9 @@ def jwt_get_username_from_payload_handler(payload):
     
 def jwt_decode_token(token):
     header = jwt.get_unverified_header(token)
-    jwks = requests.get('{}.well-known/jwks.json'.format(env("JWT_ISSUER"))).json()
+    # jwks = requests.get('{}.well-known/jwks.json'.format(env("JWT_ISSUER"))).json()
+    base_url = env("JWT_ISSUER").rstrip('/')
+    jwks = requests.get(f'{base_url}/.well-known/jwks.json').json()
     public_key = None
     for jwk in jwks['keys']:
         if jwk['kid'] == header['kid']:
